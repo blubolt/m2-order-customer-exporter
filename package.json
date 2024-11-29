@@ -1,0 +1,17 @@
+{
+  "name": "m2-order-exporter",
+  "version": "1.0.0",
+  "description": "Magento 2 Order and Customer Export Tool with rate limiting",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "export-customers": "node src/export-customers.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "p-limit": "^5.0.0"
+  }
+}
