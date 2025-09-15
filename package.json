@@ -6,7 +6,15 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "export-customers": "node src/export-customers.js"
+    "export-customers": "node src/export-customers.js",
+    "download": "node src/download-orders.js download",
+    "download:resume": "node src/download-orders.js download --resume",
+    "download:status": "node src/download-orders.js status",
+    "process": "node src/process-orders.js process",
+    "process:resume": "node src/process-orders.js process --resume",
+    "process:keep": "node src/process-orders.js process --keep-files",
+    "process:status": "node src/process-orders.js status",
+    "cleanup": "node src/process-orders.js cleanup"
   },
   "dependencies": {
     "axios": "^1.6.2",
