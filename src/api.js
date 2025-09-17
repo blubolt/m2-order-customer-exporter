@@ -12,22 +12,37 @@ export class MagentoAPI {
         });
     }
 
-    async getOrders(page = 1) {
+    async getOrders(page = 1, options = {}) {
+        const { createdFrom } = options;
         return limit(async () => {
             try {
-                const requestParams = {
-                    searchCriteria: {
-                        currentPage: page,
-                        pageSize: config.pageSize,
-                        sortOrders: [{
-                            field: 'entity_id',
-                            direction: 'desc'
-                        }]
-                    }
-                    // Removed the fields parameter that was causing issues
+                const searchCriteria = {
+                    currentPage: page,
+                    pageSize: config.pageSize,
+                    sortOrders: [{
+                        field: 'entity_id',
+                        direction: 'desc'
+                    }]
                 };
 
-                console.log(`📡 Fetching orders page ${page}...`);
+                if (createdFrom) {
+                    // Add created_at >= createdFrom filter
+                    searchCriteria.filter_groups = [
+                        {
+                            filters: [
+                                {
+                                    field: 'created_at',
+                                    value: createdFrom,
+                                    condition_type: 'gteq'
+                                }
+                            ]
+                        }
+                    ];
+                }
+
+                const requestParams = { searchCriteria };
+
+                console.log(`📡 Fetching orders page ${page}${createdFrom ? ` (from ${createdFrom})` : ''}...`);
 
                 const response = await this.client.get('/rest/V1/orders', {
                     params: requestParams

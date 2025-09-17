@@ -66,6 +66,8 @@ A high-performance Node.js tool for exporting orders and customers from Magento 
    MAGENTO_ACCESS_TOKEN_SECRET=your_access_token_secret
    REQUESTS_PER_SECOND=2
    PAGE_SIZE=50
+   # Optional: filter orders created on/after this date (YYYY-MM-DD)
+   START_DATE=2025-01-01
    ```
 
 ## Usage
@@ -91,6 +93,7 @@ npm run process:status
 #### Download Phase Commands
 ```bash
 npm run download              # Download all orders to cache files
+npm run download -- --from 2025-01-01   # Download only orders from this date
 npm run download:resume       # Resume interrupted download
 npm run download:status       # Check download progress
 ```
@@ -106,7 +109,7 @@ npm run process:status       # Check processing progress
 #### Utility Commands
 ```bash
 npm run cleanup             # Delete all cache files and status data
-npm start                   # Direct export (original single-phase method)
+npm start -- --from 2025-01-01   # Direct export from date (no caching)
 npm run export-customers    # Export customers (original functionality)
 ```
 
@@ -168,6 +171,11 @@ npm run download:status
 # Check processing progress
 npm run process:status
 ```
+
+### Date Filters
+- Use `--from YYYY-MM-DD` to include only orders created on/after the date
+- Or set `START_DATE=YYYY-MM-DD` in `.env`
+- The two-phase download saves the chosen date in its status; changing the date starts a new session
 
 ## Configuration
 

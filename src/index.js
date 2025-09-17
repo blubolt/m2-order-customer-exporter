@@ -14,6 +14,15 @@ async function ensureExportDir() {
     }
 }
 
+function parseStartDateArg() {
+    const args = process.argv.slice(2);
+    const fromIdx = args.indexOf('--from');
+    if (fromIdx !== -1 && args[fromIdx + 1]) {
+        return args[fromIdx + 1];
+    }
+    return process.env.START_DATE || null;
+}
+
 async function exportOrders() {
     try {
         console.log('🚀 Starting order export...');
@@ -39,12 +48,17 @@ async function exportOrders() {
             process.exit(1);
         }
 
+        const createdFrom = parseStartDateArg();
+        if (createdFrom) {
+            console.log(`🗓️  Filtering orders created on/after: ${createdFrom}`);
+        }
+
         console.log('📦 Starting order processing...\n');
 
         while (hasMoreOrders) {
             try {
                 console.log(`\n📄 Fetching page ${currentPage}...`);
-                const ordersResponse = await api.getOrders(currentPage);
+                const ordersResponse = await api.getOrders(currentPage, { createdFrom });
 
                 if (!ordersResponse) {
                     console.log('⚠️  No response received from API');
