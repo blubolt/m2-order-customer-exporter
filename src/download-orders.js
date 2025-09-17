@@ -33,7 +33,8 @@ class OrderDownloader {
                 lastProcessedPage: 0,
                 startTime: new Date().toISOString(),
                 completed: false,
-                errors: []
+                errors: [],
+                createdFrom: null
             };
         }
     }
@@ -68,7 +69,15 @@ class OrderDownloader {
         await writeFile(filepath, JSON.stringify(orderData, null, 2));
     }
 
-    async downloadOrders(resume = false) {
+    parseStartDateArg(flags) {
+        const fromIdx = flags.indexOf('--from');
+        if (fromIdx !== -1 && flags[fromIdx + 1]) {
+            return flags[fromIdx + 1];
+        }
+        return process.env.START_DATE || null;
+    }
+
+    async downloadOrders(resume = false, createdFrom = null) {
         try {
             console.log('🚀 Starting order download process...');
 
@@ -87,7 +96,19 @@ class OrderDownloader {
                     lastProcessedPage: 0,
                     startTime: new Date().toISOString(),
                     completed: false,
-                    errors: []
+                    errors: [],
+                    createdFrom: createdFrom || null
+                };
+            } else if (createdFrom && createdFrom !== status.createdFrom) {
+                console.log('⚠️  Provided --from differs from saved status. Starting new download session.');
+                status = {
+                    totalOrders: 0,
+                    downloadedOrders: 0,
+                    lastProcessedPage: 0,
+                    startTime: new Date().toISOString(),
+                    completed: false,
+                    errors: [],
+                    createdFrom
                 };
             }
 
@@ -102,12 +123,16 @@ class OrderDownloader {
             let currentPage = status.lastProcessedPage + 1;
             let hasMoreOrders = true;
 
+            if (status.createdFrom) {
+                console.log(`🗓️  Filtering orders created on/after: ${status.createdFrom}`);
+            }
+
             console.log(`📦 Starting download from page ${currentPage}...`);
 
             while (hasMoreOrders) {
                 try {
                     console.log(`📄 Downloading page ${currentPage}...`);
-                    const ordersResponse = await this.api.getOrders(currentPage);
+                    const ordersResponse = await this.api.getOrders(currentPage, { createdFrom: status.createdFrom });
 
                     if (!ordersResponse || !ordersResponse.items || ordersResponse.items.length === 0) {
                         console.log('🏁 No more orders to download');
@@ -240,6 +265,7 @@ class OrderDownloader {
             console.log(`   Completed: ${status.completed ? 'Yes' : 'No'}`);
             console.log(`   Errors: ${status.errors?.length || 0}`);
             console.log(`   Cache Directory: ${this.cacheDir}`);
+            console.log(`   From Date: ${status.createdFrom || 'Not set'}`);
         } catch (error) {
             console.log('📊 No download status found. Run download first.');
         }
@@ -256,7 +282,12 @@ const downloader = new OrderDownloader();
 switch (command) {
     case 'download':
         const resume = flags.includes('--resume');
-        downloader.downloadOrders(resume);
+        const createdFrom = (() => {
+            const idx = flags.indexOf('--from');
+            if (idx !== -1 && flags[idx + 1]) return flags[idx + 1];
+            return process.env.START_DATE || null;
+        })();
+        downloader.downloadOrders(resume, createdFrom);
         break;
 
     case 'status':
@@ -265,12 +296,14 @@ switch (command) {
 
     default:
         console.log('📖 Usage:');
-        console.log('  node src/download-orders.js download [--resume]');
+        console.log('  node src/download-orders.js download [--resume] [--from YYYY-MM-DD]');
         console.log('  node src/download-orders.js status');
         console.log('');
+        console.log('Options:');
+        console.log('  --from YYYY-MM-DD   Only include orders created on/after this date');
+        console.log('  --resume            Resume interrupted download');
         console.log('Commands:');
-        console.log('  download         Download all orders to cache files');
-        console.log('  download --resume Resume interrupted download');
-        console.log('  status           Show download progress');
+        console.log('  download            Download all orders to cache files');
+        console.log('  status              Show download progress');
         break;
 }
