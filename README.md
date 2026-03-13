@@ -1,39 +1,19 @@
 # Magento 2 Data Exporter
 
-A Node.js tool for exporting orders and customers from Magento 2 stores. Features rate limiting to prevent server overload and detailed CSV exports with comprehensive information.
+A Node.js tool for exporting orders and customers from Magento 2 stores to CSV. Features rate limiting to prevent server overload and supports optional date range filtering.
 
-## Features
+## Prerequisites
 
-### Order Export
-- Exports complete order information including:
-  - Order details (number, date, status)
-  - Customer information
-  - Line items with SKUs and product options
-  - Payment and shipping information
-  - Transaction IDs
-  - Product types and configurable options
-
-### Customer Export
-- Exports customer data including:
-  - Basic customer information
-  - Customer group and website details
-  - All customer addresses
-  - Default billing/shipping status
-  - Contact information
-
-### General Features
-- Rate limiting to prevent server overload
-- Progress tracking and logging
-- Error handling with continued processing
-- Timestamped CSV files
-- Configurable batch sizes
+- Node.js (v18+)
+- Access to the Magento 2 store's REST API
+- A Magento integration access token with read permissions for orders and customers
 
 ## Setup
 
 1. Clone this repository:
    ```bash
    git clone [repository-url]
-   cd m2-order-exporter
+   cd m2-order-customer-exporter
    ```
 
 2. Install dependencies:
@@ -46,113 +26,99 @@ A Node.js tool for exporting orders and customers from Magento 2 stores. Feature
    cp .env.example .env
    ```
 
-4. Configure your `.env` file with your Magento 2 store details:
+4. Fill in your `.env` file:
    ```
    MAGENTO_BASE_URL=https://your-store.com
    MAGENTO_ACCESS_TOKEN=your_access_token
-   MAGENTO_CONSUMER_KEY=your_consumer_key
-   MAGENTO_CONSUMER_SECRET=your_consumer_secret
-   MAGENTO_ACCESS_TOKEN_SECRET=your_access_token_secret
    REQUESTS_PER_SECOND=2
    PAGE_SIZE=50
    ```
 
+   - `MAGENTO_BASE_URL` — your Magento store's base URL (no trailing slash)
+   - `MAGENTO_ACCESS_TOKEN` — integration access token from Magento Admin > System > Integrations
+   - `REQUESTS_PER_SECOND` — API rate limit (default: 2, increase carefully)
+   - `PAGE_SIZE` — records per API page (default: 50)
+
 ## Usage
 
+Exported CSV files are saved to the `exports/` directory with a timestamp in the filename.
+
 ### Export Orders
-Run the order export:
+
+Export all orders:
 ```bash
 npm start
 ```
 
-The order export will create a CSV file in the `exports` directory with the following information:
-- Order details (number, date, status)
-- Customer information
-- Line items (one row per item)
-- Payment and shipping details
-- Transaction information
-- Product details including SKUs and options
+Export orders from a specific date onwards:
+```bash
+node src/index.js 2026-01-01
+```
+
+Export orders within a date range:
+```bash
+node src/index.js 2026-01-01 2026-03-13
+```
+
+You can also set dates via environment variables:
+```bash
+FROM_DATE=2026-01-01 TO_DATE=2026-03-13 npm start
+```
+
+Output file: `exports/orders_export_[timestamp].csv`
+
+Each order produces one row per line item plus one row for the shipping line. All order-level fields (customer, billing/shipping address, totals, payment) are repeated on each row.
+
+**Columns include:** Order ID, date, status, customer details, billing & shipping address, totals (subtotal, shipping, tax, grand total), payment method & status, transaction IDs, line item details (SKU, name, qty, price, discount), and up to 2 tax bands.
 
 ### Export Customers
-Run the customer export:
+
+Export all customers:
 ```bash
 npm run export-customers
 ```
 
-The customer export will create a CSV file in the `exports` directory with the following information:
-- Customer basic details
-- Customer group information
-- All addresses (one row per address)
-- Default billing/shipping indicators
-- Contact information
+Export customers created from a specific date onwards:
+```bash
+node src/export-customers.js 2026-01-01
+```
 
-## Configuration
+Export customers created within a date range:
+```bash
+node src/export-customers.js 2026-01-01 2026-03-13
+```
 
-### Environment Variables
-- `MAGENTO_BASE_URL`: Your Magento 2 store URL
-- `MAGENTO_ACCESS_TOKEN`: Integration access token
-- `MAGENTO_CONSUMER_KEY`: Integration consumer key
-- `MAGENTO_CONSUMER_SECRET`: Integration consumer secret
-- `MAGENTO_ACCESS_TOKEN_SECRET`: Integration access token secret
-- `REQUESTS_PER_SECOND`: Number of API requests per second (default: 2)
-- `PAGE_SIZE`: Number of items to fetch per request (default: 50)
+Output file: `exports/customers_export_[timestamp].csv`
 
-### Rate Limiting
-The tool implements rate limiting to prevent overwhelming your Magento server:
-- Configurable requests per second via `REQUESTS_PER_SECOND`
-- Default is 2 requests per second
-- Adjust based on your server's capacity
+Each customer produces one row per saved address. All customer-level fields are repeated on each row.
 
-### Batch Size
-- Configurable via `PAGE_SIZE`
-- Default is 50 items per request
-- Adjust based on your data size and server capacity
+**Columns include:** Customer ID, email, name, created date, group/store/website IDs, date of birth, gender, address details (billing/shipping type, street, city, region, postcode, country, phone), and order summary stats (total orders, total spent, average order value).
 
 ## Output Files
 
-### Orders Export
-Creates a file named `orders_export_[timestamp].csv` containing:
-- One row per order line item
-- All order information repeated for each line
-- Detailed product information
-- Transaction and payment details
-
-### Customers Export
-Creates a file named `customers_export_[timestamp].csv` containing:
-- One row per customer address
-- All customer information repeated for each address
-- Detailed address information
-- Default address indicators
+| Script | Output filename |
+|--------|----------------|
+| Orders | `exports/orders_export_[timestamp].csv` |
+| Customers | `exports/customers_export_[timestamp].csv` |
 
 ## Error Handling
-- Continues processing if individual items fail
-- Logs errors for review
-- Maintains progress even if some items fail
-- Creates export file even with partial data
 
-## Development
+- Individual failed orders/customers are logged and skipped — the export continues
+- A 401 authentication error will stop the export immediately
+- Partial exports are written to file as they are processed
 
-### Project Structure
+## Project Structure
+
 ```
-m2-order-exporter/
+m2-order-customer-exporter/
 ├── src/
-│   ├── index.js           # Order export main script
-│   ├── export-customers.js # Customer export script
-│   ├── api.js             # Magento API client
-│   ├── csv-writer.js      # CSV writing functionality
-│   └── config.js          # Configuration management
-├── exports/               # Export output directory
-├── .env                   # Environment configuration
-├── .env.example          # Example environment configuration
-└── package.json          # Project dependencies
+│   ├── index.js             # Order export entry point
+│   ├── export-customers.js  # Customer export entry point
+│   ├── api.js               # Magento REST API client
+│   ├── csv-writer.js        # Order CSV formatting and writing
+│   └── config.js            # Configuration (reads from .env)
+├── exports/                 # CSV output directory (auto-created)
+├── .env                     # Your local environment config (not committed)
+├── .env.example             # Template for .env
+└── package.json
 ```
-
-### Adding New Features
-1. Update the relevant script in `src/`
-2. Add any new API endpoints to `api.js`
-3. Update CSV headers in the relevant writer
-4. Update documentation in README.md
-
-## License
-
-MIT License - See LICENSE file for details

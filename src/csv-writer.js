@@ -54,6 +54,7 @@ export class CSVWriter {
         { id: "item_vendor", title: "Line: Vendor" },
         { id: "product_options", title: "Line: Properties" },
         { id: "item_taxable", title: "Line: Taxable" },
+        { id: "line_type", title: "Line: Type" },
         { id: "tax1_title", title: "Tax 1: Title" },
         { id: "tax1_rate", title: "Tax 1: Rate" },
         { id: "tax1_price", title: "Tax 1: Price" },
@@ -227,8 +228,8 @@ export class CSVWriter {
       ...getTaxDetails(order),
     };
 
-    // Create a row for each order item
-    return order.items.map((item) => {
+    // Create rows for order items and shipping line
+    const itemRows = order.items.map((item) => {
       // Extract product options
       let productOptions = "";
       if (item.product_options) {
@@ -268,8 +269,30 @@ export class CSVWriter {
         item_vendor: item.vendor || "",
         product_options: productOptions,
         item_taxable: item.tax_amount > 0 ? "TRUE" : "FALSE",
+        line_type: "Line Item",
       };
     });
+
+    // Create shipping line row
+    const shippingRow = {
+      ...baseOrderData,
+      item_id: "",
+      product_id: "",
+      item_sku: "",
+      item_name: order.shipping_description || "",
+      item_variant_title: "",
+      item_qty: "",
+      item_price: order.shipping_amount || 0,
+      item_discount: 0,
+      item_total: order.shipping_amount || 0,
+      item_requires_shipping: "",
+      item_vendor: "",
+      product_options: "",
+      item_taxable: "",
+      line_type: "Shipping Line",
+    };
+
+    return [...itemRows, shippingRow];
   }
 
   async writeRecords(records) {
