@@ -32,6 +32,8 @@ A Node.js tool for exporting orders and customers from Magento 2 stores to CSV. 
    MAGENTO_ACCESS_TOKEN=your_access_token
    REQUESTS_PER_SECOND=2
    PAGE_SIZE=50
+   # Optional: filter orders created on/after this date (YYYY-MM-DD)
+   START_DATE=2025-01-01
    ```
 
    - `MAGENTO_BASE_URL` — your Magento store's base URL (no trailing slash)
