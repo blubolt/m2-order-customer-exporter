@@ -1,306 +1,309 @@
-import { createObjectCsvWriter } from "csv-writer";
-import { join } from "path";
-import { config } from "./config.js";
+import { createObjectCsvWriter } from 'csv-writer';
+import { join } from 'path';
+import { access, constants } from 'fs/promises';
+import { config } from './config.js';
 
 export class CSVWriter {
-  constructor() {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `orders_export_${timestamp}.csv`;
+    constructor(filename = null, append = false) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        this.filename = filename || `orders_export_${timestamp}.csv`;
+        this.filepath = join(config.exportDir, this.filename);
+        this.append = append;
+        this.isFirstWrite = true;
 
-    this.csvWriter = createObjectCsvWriter({
-      path: join(config.exportDir, filename),
-      header: [
-        { id: "increment_id", title: "ID" },
-        { id: "created_at", title: "Processed At" },
-        { id: "status", title: "Fulfillment: Status" },
-        { id: "customer_email", title: "Customer Email" },
-        { id: "customer_firstname", title: "Customer First Name" },
-        { id: "customer_lastname", title: "Customer Last Name" },
-        { id: "billing_firstname", title: "Billing First Name" },
-        { id: "billing_lastname", title: "Billing Last Name" },
-        { id: "billing_street", title: "Billing Address 1" },
-        { id: "billing_city", title: "Billing City" },
-        { id: "billing_region", title: "Billing Province" },
-        { id: "billing_postcode", title: "Billing Zip" },
-        { id: "billing_country_id", title: "Billing Country" },
-        { id: "billing_telephone", title: "Billing Phone" },
-        { id: "shipping_firstname", title: "Shipping First Name" },
-        { id: "shipping_lastname", title: "Shipping Last Name" },
-        { id: "shipping_street", title: "Shipping Address 1" },
-        { id: "shipping_city", title: "Shipping City" },
-        { id: "shipping_region", title: "Shipping Province" },
-        { id: "shipping_postcode", title: "Shipping Zip" },
-        { id: "shipping_country_id", title: "Shipping Country" },
-        { id: "shipping_telephone", title: "Shipping Phone" },
-        { id: "total_item_count", title: "Total Items" },
-        { id: "subtotal", title: "Subtotal" },
-        { id: "shipping_amount", title: "Shipping Amount" },
-        { id: "tax_amount", title: "Tax Amount" },
-        { id: "grand_total", title: "Grand Total" },
-        { id: "shipping_description", title: "Shipping Method" },
-        { id: "payment_method", title: "Payment Method" },
-        { id: "payment_status", title: "Payment: Status" },
-        { id: "transaction_ids", title: "Transaction IDs" },
-        { id: "item_id", title: "Line: ID" },
-        { id: "product_id", title: "Line: Product ID" },
-        { id: "item_sku", title: "Line: SKU" },
-        { id: "item_name", title: "Line: Title" },
-        { id: "item_variant_title", title: "Line: Variant Title" },
-        { id: "item_qty", title: "Line: Quantity" },
-        { id: "item_price", title: "Line: Price" },
-        { id: "item_discount", title: "Line: Discount" },
-        { id: "item_total", title: "Line: Total" },
-        { id: "item_requires_shipping", title: "Line: Requires Shipping" },
-        { id: "item_vendor", title: "Line: Vendor" },
-        { id: "product_options", title: "Line: Properties" },
-        { id: "item_taxable", title: "Line: Taxable" },
-        { id: "line_type", title: "Line: Type" },
-        { id: "tax1_title", title: "Tax 1: Title" },
-        { id: "tax1_rate", title: "Tax 1: Rate" },
-        { id: "tax1_price", title: "Tax 1: Price" },
-        { id: "tax2_title", title: "Tax 2: Title" },
-        { id: "tax2_rate", title: "Tax 2: Rate" },
-        { id: "tax2_price", title: "Tax 2: Price" },
-      ],
-      headerIdToString: false,
-      append: false,
-    });
-  }
+        this.headers = [
+            { id: 'increment_id', title: 'Order Number' },
+            { id: 'created_at', title: 'Order Date' },
+            { id: 'status', title: 'Status' },
+            { id: 'fulfillment_date', title: 'Fulfillment Date' },
+            { id: 'customer_email', title: 'Customer Email' },
+            { id: 'customer_firstname', title: 'Customer First Name' },
+            { id: 'customer_lastname', title: 'Customer Last Name' },
+            { id: 'total_item_count', title: 'Total Items' },
+            { id: 'subtotal', title: 'Subtotal' },
+            { id: 'shipping_amount', title: 'Shipping Amount' },
+            { id: 'tax_amount', title: 'Tax Amount' },
+            { id: 'grand_total', title: 'Grand Total' },
+            { id: 'shipping_description', title: 'Shipping Method' },
+            { id: 'payment_method', title: 'Payment Method' },
+            { id: 'transaction_ids', title: 'Transaction IDs' },
+            // Billing Address fields
+            { id: 'billing_firstname', title: 'Billing First Name' },
+            { id: 'billing_lastname', title: 'Billing Last Name' },
+            { id: 'billing_company', title: 'Billing Company' },
+            { id: 'billing_street', title: 'Billing Street' },
+            { id: 'billing_city', title: 'Billing City' },
+            { id: 'billing_region', title: 'Billing Region' },
+            { id: 'billing_postcode', title: 'Billing Postcode' },
+            { id: 'billing_country_id', title: 'Billing Country' },
+            { id: 'billing_telephone', title: 'Billing Telephone' },
+            // Shipping Address fields
+            { id: 'shipping_firstname', title: 'Shipping First Name' },
+            { id: 'shipping_lastname', title: 'Shipping Last Name' },
+            { id: 'shipping_company', title: 'Shipping Company' },
+            { id: 'shipping_street', title: 'Shipping Street' },
+            { id: 'shipping_city', title: 'Shipping City' },
+            { id: 'shipping_region', title: 'Shipping Region' },
+            { id: 'shipping_postcode', title: 'Shipping Postcode' },
+            { id: 'shipping_country_id', title: 'Shipping Country' },
+            { id: 'shipping_telephone', title: 'Shipping Telephone' },
+            // Line item specific fields
+            { id: 'item_sku', title: 'Item SKU' },
+            { id: 'item_parent_sku', title: 'Parent SKU' },
+            { id: 'item_name', title: 'Item Name' },
+            { id: 'item_qty', title: 'Item Quantity' },
+            { id: 'item_price', title: 'Item Price' },
+            { id: 'item_row_total', title: 'Item Row Total' },
+            { id: 'product_type', title: 'Product Type' },
+            { id: 'product_options', title: 'Product Options' }
+        ];
 
-  formatOrderData(order, transactions) {
-    const transactionIds = transactions.items
-      .map((t) => t.transaction_id)
-      .join(";");
-
-    const payment =
-      order.payment && order.payment.method ? order.payment.method : "N/A";
-
-    // Helper function to format phone numbers
-    const formatPhoneNumber = (phone) => {
-      if (!phone) return "";
-
-      // If starts with +, remove it and any following digits until we hit a 0
-      if (phone.startsWith("+")) {
-        // Remove the + and country code, handling cases with and without spaces
-        return phone.replace(/^\+\d+\s*/, "");
-      }
-
-      return phone;
-    };
-
-    // Map Magento payment status to Shopify format
-    const getPaymentStatus = (order) => {
-      // Check if order is fully refunded
-      if (order.total_refunded && order.total_refunded >= order.grand_total) {
-        return "refunded";
-      }
-      // Check if order is partially refunded
-      if (order.total_refunded > 0) {
-        return "partially_refunded";
-      }
-
-      // Get payment status from order payment
-      const paymentState =
-        order.payment?.additional_information?.[0] || order.status;
-
-      switch (paymentState?.toLowerCase()) {
-        case "pending":
-        case "pending_payment":
-          return "pending";
-        case "processing":
-        case "authorized":
-        case "authorization":
-          return "authorized";
-        case "complete":
-        case "closed":
-        case "paid":
-          return "paid";
-        case "canceled":
-        case "void":
-          return "voided";
-        default:
-          // If payment exists and amount is paid, consider it paid
-          if (order.payment && order.payment.amount_paid >= order.grand_total) {
-            return "paid";
-          }
-          // If payment exists but only partial amount is paid
-          if (order.payment && order.payment.amount_paid > 0) {
-            return "partially_paid";
-          }
-          // Default to pending if we can't determine status
-          return "pending";
-      }
-    };
-
-    // Format addresses
-    const billing = order.billing_address || {};
-    const shipping =
-      order.extension_attributes?.shipping_assignments?.[0]?.shipping
-        ?.address ||
-      order.shipping_address ||
-      {};
-
-    // In formatOrderData, before the return statement:
-    const getTaxDetails = (order) => {
-      const taxDetails = {
-        tax1_title: "",
-        tax1_rate: "",
-        tax1_price: "",
-        tax2_title: "",
-        tax2_rate: "",
-        tax2_price: "",
-      };
-
-      // Try to get tax information from various Magento locations
-      const taxInfo =
-        order.extension_attributes?.tax_rates ||
-        order.tax_info ||
-        order.tax_details;
-
-      if (taxInfo && Array.isArray(taxInfo)) {
-        // Handle multiple tax rates
-        taxInfo.forEach((tax, index) => {
-          if (index < 2) {
-            // Only handle first two tax rates
-            const num = index + 1;
-            taxDetails[`tax${num}_title`] =
-              tax.title || tax.code || `Tax ${num}`;
-            // Convert percentage to decimal (20% -> 0.20)
-            taxDetails[`tax${num}_rate`] = (tax.percent || tax.rate || 0) / 100;
-            taxDetails[`tax${num}_price`] = tax.amount || 0;
-          }
-        });
-      } else {
-        // Fallback: If we only have basic tax information, use it for Tax 1
-        if (order.tax_amount > 0) {
-          taxDetails.tax1_title = "Tax";
-          // Convert percentage to decimal (20% -> 0.20)
-          const firstItem = order.items?.[0];
-          taxDetails.tax1_rate = firstItem?.tax_percent
-            ? firstItem.tax_percent / 100
-            : "";
-          taxDetails.tax1_price = order.tax_amount || 0;
-        }
-      }
-
-      return taxDetails;
-    };
-
-    // Add tax details to baseOrderData
-    const baseOrderData = {
-      increment_id: order.increment_id,
-      created_at: order.created_at,
-      status: order.status,
-      payment_status: getPaymentStatus(order),
-      customer_email: order.customer_email,
-      customer_firstname: order.customer_firstname || "Guest",
-      customer_lastname: order.customer_lastname || "Guest",
-      // Billing address with Province
-      billing_firstname: billing.firstname || "",
-      billing_lastname: billing.lastname || "",
-      billing_street: Array.isArray(billing.street)
-        ? billing.street.join(", ")
-        : billing.street || "",
-      billing_city: billing.city || "",
-      billing_region: billing.region_code || billing.region || "", // Prefer region_code for province
-      billing_postcode: billing.postcode || "",
-      billing_country_id: billing.country_id || "",
-      billing_telephone: formatPhoneNumber(billing.telephone) || "",
-      // Shipping address with Province
-      shipping_firstname: shipping.firstname || "",
-      shipping_lastname: shipping.lastname || "",
-      shipping_street: Array.isArray(shipping.street)
-        ? shipping.street.join(", ")
-        : shipping.street || "",
-      shipping_city: shipping.city || "",
-      shipping_region: shipping.region_code || shipping.region || "", // Prefer region_code for province
-      shipping_postcode: shipping.postcode || "",
-      shipping_country_id: shipping.country_id || "",
-      shipping_telephone: formatPhoneNumber(shipping.telephone) || "",
-      total_item_count: order.total_item_count,
-      subtotal: order.subtotal,
-      shipping_amount: order.shipping_amount,
-      tax_amount: order.tax_amount,
-      grand_total: order.grand_total,
-      shipping_description: order.shipping_description,
-      payment_method: payment,
-      transaction_ids: transactionIds,
-      ...getTaxDetails(order),
-    };
-
-    // Create rows for order items and shipping line
-    const itemRows = order.items.map((item) => {
-      // Extract product options
-      let productOptions = "";
-      if (item.product_options) {
-        try {
-          const options =
-            typeof item.product_options === "string"
-              ? JSON.parse(item.product_options)
-              : item.product_options;
-
-          if (options.attributes_info) {
-            productOptions = options.attributes_info
-              .map((attr) => `${attr.label}: ${attr.value}`)
-              .join("\n");
-          }
-        } catch (e) {
-          console.warn(
-            `Could not parse product options for item ${item.sku} in order ${order.increment_id}`
-          );
-        }
-      }
-
-      return {
-        ...baseOrderData,
-        item_id: item.item_id || "",
-        product_id: item.product_id || "",
-        item_sku: item.sku || "",
-        item_name: item.name || "",
-        item_variant_title: item.variant_title || "",
-        item_qty: item.qty_ordered || 0,
-        item_price: item.price || 0,
-        item_discount: item.discount_amount
-          ? -Math.abs(item.discount_amount)
-          : 0,
-        item_total: item.row_total || 0,
-        item_requires_shipping:
-          item.product_type !== "virtual" ? "TRUE" : "FALSE",
-        item_vendor: item.vendor || "",
-        product_options: productOptions,
-        item_taxable: item.tax_amount > 0 ? "TRUE" : "FALSE",
-        line_type: "Line Item",
-      };
-    });
-
-    // Create shipping line row
-    const shippingRow = {
-      ...baseOrderData,
-      item_id: "",
-      product_id: "",
-      item_sku: "",
-      item_name: order.shipping_description || "",
-      item_variant_title: "",
-      item_qty: "",
-      item_price: order.shipping_amount || 0,
-      item_discount: 0,
-      item_total: order.shipping_amount || 0,
-      item_requires_shipping: "",
-      item_vendor: "",
-      product_options: "",
-      item_taxable: "",
-      line_type: "Shipping Line",
-    };
-
-    return [...itemRows, shippingRow];
-  }
-
-  async writeRecords(records) {
-    try {
-      await this.csvWriter.writeRecords(records);
-    } catch (error) {
-      console.error("Error writing to CSV:", error);
-      throw error;
+        this.initializeWriter();
     }
-  }
+
+    async initializeWriter() {
+        // Check if file exists when appending
+        let fileExists = false;
+        if (this.append) {
+            try {
+                await access(this.filepath, constants.F_OK);
+                fileExists = true;
+                this.isFirstWrite = false;
+                console.log(`📄 Appending to existing file: ${this.filename}`);
+            } catch {
+                console.log(`📄 Creating new file: ${this.filename}`);
+            }
+        } else {
+            console.log(`📄 Creating new file: ${this.filename}`);
+        }
+
+        this.csvWriter = createObjectCsvWriter({
+            path: this.filepath,
+            header: this.headers,
+            headerIdToString: false,
+            append: this.append && fileExists // Only append if file exists
+        });
+    }
+
+    async fileExists() {
+        try {
+            await access(this.filepath, constants.F_OK);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    getFilepath() {
+        return this.filepath;
+    }
+
+    getFilename() {
+        return this.filename;
+    }
+
+    formatOrderData(order, transactions) {
+        // Handle transactions from cached data
+        const transactionData = transactions || order._transactions;
+        const transactionIds = transactionData?.items
+            ?.map(t => t.transaction_id)
+            .join(';') || '';
+
+        const payment = order.payment && order.payment.method
+            ? order.payment.method
+            : 'N/A';
+
+        // Extract fulfillment date from shipments
+        const fulfillmentDate = this.extractFulfillmentDate(order);
+
+        // Extract billing address information
+        const billingAddress = this.extractBillingAddress(order);
+
+        // Extract shipping address information
+        const shippingAddress = this.extractShippingAddress(order);
+
+        // Base order data that will be copied to each line
+        const baseOrderData = {
+            increment_id: order.increment_id,
+            created_at: order.created_at,
+            status: order.status,
+            fulfillment_date: fulfillmentDate,
+            customer_email: order.customer_email,
+            customer_firstname: order.customer_firstname || 'Guest',
+            customer_lastname: order.customer_lastname || 'Guest',
+            total_item_count: order.total_item_count,
+            subtotal: order.subtotal,
+            shipping_amount: order.shipping_amount,
+            tax_amount: order.tax_amount,
+            grand_total: order.grand_total,
+            shipping_description: order.shipping_description,
+            payment_method: payment,
+            transaction_ids: transactionIds,
+            // Billing address fields
+            billing_firstname: billingAddress.firstname,
+            billing_lastname: billingAddress.lastname,
+            billing_company: billingAddress.company,
+            billing_street: billingAddress.street,
+            billing_city: billingAddress.city,
+            billing_region: billingAddress.region,
+            billing_postcode: billingAddress.postcode,
+            billing_country_id: billingAddress.country_id,
+            billing_telephone: billingAddress.telephone,
+            // Shipping address fields
+            shipping_firstname: shippingAddress.firstname,
+            shipping_lastname: shippingAddress.lastname,
+            shipping_company: shippingAddress.company,
+            shipping_street: shippingAddress.street,
+            shipping_city: shippingAddress.city,
+            shipping_region: shippingAddress.region,
+            shipping_postcode: shippingAddress.postcode,
+            shipping_country_id: shippingAddress.country_id,
+            shipping_telephone: shippingAddress.telephone
+        };
+
+        // Create a row for each order item
+        return order.items.map(item => {
+            // Extract product options
+            let productOptions = '';
+            if (item.product_options) {
+                try {
+                    const options = typeof item.product_options === 'string'
+                        ? JSON.parse(item.product_options)
+                        : item.product_options;
+
+                    if (options.attributes_info) {
+                        productOptions = options.attributes_info
+                            .map(attr => `${attr.label}: ${attr.value}`)
+                            .join('; ');
+                    }
+                } catch (e) {
+                    console.warn(`Could not parse product options for item ${item.sku} in order ${order.increment_id}`);
+                }
+            }
+
+            return {
+                ...baseOrderData,
+                item_sku: item.sku,
+                item_parent_sku: item.parent_item_id ? order.items.find(i => i.item_id === item.parent_item_id)?.sku || '' : '',
+                item_name: item.name,
+                item_qty: item.qty_ordered,
+                item_price: item.price,
+                item_row_total: item.row_total,
+                product_type: item.product_type || '',
+                product_options: productOptions
+            };
+        });
+    }
+
+    extractFulfillmentDate(order) {
+        // Try to get fulfillment date from various possible sources
+
+        // Check if order has shipments and get the earliest shipment date
+        if (order.extension_attributes && order.extension_attributes.shipments && order.extension_attributes.shipments.length > 0) {
+            const shipmentDates = order.extension_attributes.shipments
+                .filter(s => s.created_at)
+                .map(s => new Date(s.created_at))
+                .sort((a, b) => a - b);
+
+            if (shipmentDates.length > 0) {
+                return shipmentDates[0].toISOString().split('T')[0]; // Return date part only
+            }
+        }
+
+        // Check if order status history contains shipment information
+        if (order.status_histories && order.status_histories.length > 0) {
+            const shipmentHistory = order.status_histories.find(h =>
+                h.status === 'complete' ||
+                h.status === 'shipped' ||
+                (h.comment && h.comment.toLowerCase().includes('shipped'))
+            );
+
+            if (shipmentHistory) {
+                return new Date(shipmentHistory.created_at).toISOString().split('T')[0];
+            }
+        }
+
+        // Check if order status indicates completion
+        if (order.status === 'complete' && order.updated_at) {
+            return new Date(order.updated_at).toISOString().split('T')[0];
+        }
+
+        // Return empty string if no fulfillment date found
+        return '';
+    }
+
+    extractBillingAddress(order) {
+        const defaultAddress = {
+            firstname: '',
+            lastname: '',
+            company: '',
+            street: '',
+            city: '',
+            region: '',
+            postcode: '',
+            country_id: '',
+            telephone: ''
+        };
+
+        if (!order.billing_address) {
+            return defaultAddress;
+        }
+
+        const billing = order.billing_address;
+        return {
+            firstname: billing.firstname || '',
+            lastname: billing.lastname || '',
+            company: billing.company || '',
+            street: Array.isArray(billing.street) ? billing.street.join(', ') : (billing.street || ''),
+            city: billing.city || '',
+            region: billing.region || (billing.region_code || ''),
+            postcode: billing.postcode || '',
+            country_id: billing.country_id || '',
+            telephone: billing.telephone || ''
+        };
+    }
+
+    extractShippingAddress(order) {
+        const defaultAddress = {
+            firstname: '',
+            lastname: '',
+            company: '',
+            street: '',
+            city: '',
+            region: '',
+            postcode: '',
+            country_id: '',
+            telephone: ''
+        };
+
+        // For virtual/downloadable products, there might not be a shipping address
+        if (!order.extension_attributes || !order.extension_attributes.shipping_assignments ||
+            !order.extension_attributes.shipping_assignments[0] ||
+            !order.extension_attributes.shipping_assignments[0].shipping ||
+            !order.extension_attributes.shipping_assignments[0].shipping.address) {
+            return defaultAddress;
+        }
+
+        const shipping = order.extension_attributes.shipping_assignments[0].shipping.address;
+        return {
+            firstname: shipping.firstname || '',
+            lastname: shipping.lastname || '',
+            company: shipping.company || '',
+            street: Array.isArray(shipping.street) ? shipping.street.join(', ') : (shipping.street || ''),
+            city: shipping.city || '',
+            region: shipping.region || (shipping.region_code || ''),
+            postcode: shipping.postcode || '',
+            country_id: shipping.country_id || '',
+            telephone: shipping.telephone || ''
+        };
+    }
+
+    async writeRecords(records) {
+        try {
+            await this.csvWriter.writeRecords(records);
+        } catch (error) {
+            console.error('Error writing to CSV:', error);
+            throw error;
+        }
+    }
 }
